@@ -1,5 +1,10 @@
-# dressmatic
+# Dressmatic
 An application that manages wardrobes for the blind. It also helps them choose and match outfits.
+## Created by Guides:
+Kareem Elsawah
+Ahmed Emad
+Emad Mostafa
+Omar Shawky
 
 ## Datasets:
 * Polyvore(409k)
