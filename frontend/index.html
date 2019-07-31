@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="theme-color" content="#2196f3">
+	<meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap:">
+	<title>DressMe</title>
+	<link rel="stylesheet" href="css/framework7.bundle.css">
+	<link rel="stylesheet" href="css/app.css">
+
+
+</head>
+
+<body>
+
+	<div id="app">
+
+		<div onmousedown="mDown()" style="width:100%;height:100%;">
+
+			<div class="view view-main view-init safe-areas" data-master-detail-breakpoint="800" data-url="/">
+				<div class="page">
+					<div class="navbar">
+
+						<div class="title-large">
+							<div class="title-large-text custom-text customcenter">Dress Me</div>
+						</div>
+
+
+					</div>
+
+					<div class="page-content">
+						<br>
+						<br>
+						<br>
+						<br>
+						<button class="col button button-large button-fill custombutton" id="buttonMain"><i class="f7-icons">mic</i></button>
+
+
+						<br>
+						<center> <video width=333.33 height=250 id="player" style="display:none;" autoplay></video> </center>
+
+						<center> <canvas id="canvas" width=333.33 height=250></canvas> </center>
+
+
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+
+
+	<script src="js/framework7.bundle.js"></script>
+	<script src="js/routes.js"></script>
+	<script src="js/app.js"></script>
+	<script type="text/javascript" src="js/Functions.js"></script>
+</body>
+
+</html>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.4.5/p5.min.js"></script>
+<script src="p5.js"></script>
+<script src="p5.dom.js"></script>
+<script src="p5.speech.js"></script>
+<script src="annyang.min.js"></script>
+<script src="annyang.js"></script>
+<script>
+	const buttonMain = document.getElementById('buttonMain');
+	const player = document.getElementById('player');
+	const canvas = document.getElementById('canvas');
+	const context = canvas.getContext('2d');
+	var totalClothesNo;
+
+	var last_added_type = "";
+
+	//buttonMain.addEventListener('click',function choose(){
+
+	if (annyang) {
+		// Let's define our first command. First the text we expect, and then the function it should call
+		var test, test2, test3;
+		var picTaken = false;
+		var cameraOpened = false;
+		var modeSelected = false;
+		var submode;
+		var chosen_outfit;
+		var myVoice = new p5.Speech();
+		myVoice.setRate(1);
+
+
+		var commands = {
+			//inputs
+
+			'enter*order': function(order) {
+				picTaken = false;
+				cameraOpened = false;
+				test = order.toString(order);
+				modeSelected = true;
+
+
+				switch (test) {
+					case " new":
+						myVoice.speak('ok! inputing new clothes ... please, say open camera');
+						submode = 'new';
+						break;
+
+					case " old":
+						myVoice.speak('ok! inputing old clothes ... please, say open camera');
+						submode = 'old';
+
+						break;
+
+					case " washed":
+						myVoice.speak('ok! inputing washed clothes ... please, say open camera');
+						submode = 'wash';
+						break;
+
+				}
+			},
+
+			//outputs
+
+			'output': function() {
+				picTaken = false;
+				cameraOpened = false;
+				modeSelected = true;
+				myVoice.speak('Choosing clothes mode.');
+				submode = "out";
+
+
+
+				outfit = chooseOutfit();
+				if (outfit==null) {
+					myVoice.speak('You either have no clothes available or you have refused them all... PLease start all over again');
+				} else {
+					var text = makeTextForRemovingOutfitConfirmation(outfit);
+					text += ' please say yes if you will take them out or no if you want another one'
+					myVoice.speak(text);
+				}
+
+
+			},
+
+			//wash
+
+			'washing mode': function() {
+				modeSelected = true;
+				picTaken = false;
+				cameraOpened = false;
+				submode = "wash";
+				/*
+				var laundry = clothesToWash(); //return array of cothes needs washing
+				if (laundry == []) {
+					myVoice.speak('no clothes needs washing');
+				} else {
+					myVoice.speak("You've got " + laundry.length + " pieces of clothes to be washed");
+					myVoice.speak('Say yes if you wish to take them out, say no if not');
+				}
+*/
+			},
+			'yes': function() {
+
+								if (modeSelected) {
+									if (submode == "wash") {
+										var laundry = clothesToWash();
+										var order;
+										for (var i = 0; i < laundry.length; i++) {
+											order = localStorage.getItem("order" + laundry[i]);
+											outputClothes(laundry[i]);
+											var text = "Take out clothes number " + order;
+											myVoice.speak(text);
+										}
+										//output order and type of clothes in outfit
+
+									} else if (submode == "out") {
+										text = makeTextForRemovingOutfitfinal(chosen_outfit);
+										outfitRemoval(chosen_outfit);
+										//outfitRemovalDenied(outfitID);
+										myVoice.speak(text);
+
+									} else {
+										myVoice.speak('you werent asked to say yes or no');
+
+									}
+
+								} else {
+									myVoice.speak('please select a mode first');
+								}
+
+			},
+			'no': function() {
+
+								if (modeSelected) {
+									if (submode == "wash") {
+										myVoice.speak('Sure! ask me about them later');
+									} else if (submode == "out") {
+										chosen_outfit = null;
+										myVoice.speak('if you want another one please say output');
+
+									} else {
+										myVoice.speak('you werent asked to say yes or no');
+
+									}
+
+								} else {
+									myVoice.speak('please select a mode first');
+								}
+
+			},
+
+			'help': function() {
+				modeSelected = false;
+				cameraOpened = false;
+				picTaken = false;
+				myVoice.setRate(0.8);
+				myVoice.speak(
+					'please listen to the following tutorial carefully ....... first lets start with the commands we have 3 types of commands Enter ..... output..... and.... washing mode...... also you can use commands like...... lets start with Enter if you want to add new clothes to the wardrobe use the ..... Enter new ...... command if you want to add clothes which are already registered on the app use the .... Enter used..... command if you want to add clothes that you took to wash use the ..... Enter washed..... command , now for the picking clothes command use ... output ..., when  you want to take dirty clothes to wash them use the .... washing mode command......please say help if you need to here this again or ...next help... to  proceed '
+				);
+				myVoice.setRate(1);
+			},
+
+
+
+			'next help': function() {
+				modeSelected = false;
+				cameraOpened = false;
+				picTaken = false;
+				app.setRate(0.8);
+				myVoice.speak(
+					'please listen to the following tutorial carefully ....... first after you select your mode use the command ... open camera ... to open your phone camera then use ... shoot ... you take the photo by holding the piece with one fully stetched arm and hold  your phone with the other one close to your chest ..... ok moving on when you feel you are ready say ... shoot ... to take the picture'
+				);
+				myVoice.setRate(1);
+			},
+
+			'open camera': function() {
+				picTaken = false;
+				cameraOpened = true;
+				if (modeSelected) {
+					myVoice.speak('ready to take picture say ....take photo ....to take the photo');
+					videoPlayer(player);
+				} else {
+					myVoice.speak('please select a mode first');
+				}
+
+			},
+
+			'take photo': function() {
+				if (modeSelected) {
+					if (cameraOpened) {
+						myVoice.speak('Picture taken ... please wait for 15 seconds until it is processed');
+						var ctr = captureImage(player, canvas, context);
+						picTaken = true;
+						videoPlayerClose(player);
+
+
+						if (submode == "new") {
+							inputNew(context);
+
+						} else if (submode == "old" || submode == "wash") {
+							inputOld(context);
+						} else {
+							myVoice.speak('something went wrong please start again');
+						}
+
+
+					} else {
+						myVoice.speak('please select a mode first');
+					}
+				} else {
+					myVoice.speak('Please select a mode and open up your camera first');
+				}
+				// add your code
+			},
+			'stop': function() {
+				myVoice.stop();
+				myVoice.speak('OK!');
+			}
+
+		}
+
+
+
+		// Add our commands to annyang
+		annyang.addCommands(commands);
+		annyang.start({
+			continuous: false
+		});
+
+
+	};
+
+	function mDown() {
+		// Start listening. You can call this here, or attach this call to an event, button, etc.
+		annyang.resume();
+		console.log('Annyang resumed')
+	}
+
+	function mUp() {
+		annyang.pause();
+		console.log('Annyang paused');
+	}
+
+
+
+	function inputNew(context) {
+		var imgData = context.getImageData(0, 0, 513, 698);
+		var width = imgData.width;
+		var height = imgData.height;
+		var img_arr = [];
+		var counter = 0;
+		for (var i = 0; i < height; i++) {
+			img_row = []
+			for (var j = 0; j < width; j++) {
+				pixel = [];
+				pixel.push(imgData.data[counter]);
+				pixel.push(imgData.data[counter + 1]);
+				pixel.push(imgData.data[counter + 2]);
+				img_row.push(pixel);
+				counter += 4;
+			}
+			img_arr.push(img_row);
+		}
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				var json_string = this.responseText.replace(/\'/g, '"');
+				var result = JSON.parse(json_string);
+				var id_encoding = result["id_encoding"];
+				var outfit_encoding = result["outfit_encoding"];
+				var colors = result["colors"];
+				var main_type = result["main_type"];
+				var secondary_type = result["secondary_type"];
+
+				myVoice.speak('Processing complete ... choose the next command');
+				canvas.style = "display:none;";
+
+				if (id_encoding == "No clothes detected") {
+					myVoice.speak('No clothes detected ... please try again');
+				} else {
+					var storage_name = "current_uppers";
+					if (main_type == "Lower") {
+						storage_name = "current_lowers";
+					}
+					var current_items = JSON.parse(localStorage.getItem(storage_name));
+					var wardrobe = JSON.parse(localStorage.getItem("wardrobe"));
+					var index_added = current_items.length;
+					var new_item = [id_encoding, outfit_encoding, main_type, secondary_type, colors, index_added];
+					current_items.push(new_item);
+					wardrobe.push(new_item);
+					console.log(wardrobe);
+					localStorage.setItem("wardrobe",JSON.stringify(wardrobe));
+					localStorage.setItem(storage_name, JSON.stringify(current_items));
+
+					upper_items = JSON.parse(localStorage.getItem("current_uppers"));
+					lower_items = JSON.parse(localStorage.getItem("current_lowers"));
+					if (upper_items.length > 0 && lower_items.length > 0) {
+						//Check outfits
+						var uppers = [];
+						var lowers = [];
+						if (storage_name == "current_uppers") {
+							uppers.push(new_item);
+							for (var i = 0; i < lower_items.length; i++) {
+								lowers.push(lower_items[i]);
+							}
+						} else {
+							lowers.push(new_item);
+							for (var i = 0; i < upper_items.length; i++) {
+								uppers.push(upper_items[i]);
+							}
+						}
+						outfits_API(uppers, lowers);
+					}
+				}
+				//document.getElementById("results").innerHTML = result['colors']+" "+result['secondary_type'];
+			}
+		};
+		xhttp.open("POST", "http://ec2-18-222-219-42.us-east-2.compute.amazonaws.com/input_new", true);
+		xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+		xhttp.send(JSON.stringify(img_arr));
+	}
+
+
+	function inputOld(context) {
+		var imgData = context.getImageData(0, 0, canvas.width, canvas.height);
+		var width = imgData.width;
+		var height = imgData.height;
+		var img_arr = [];
+		var counter = 0;
+		for (var i = 0; i < height; i++) {
+			img_row = []
+			for (var j = 0; j < width; j++) {
+				pixel = [];
+				pixel.push(imgData.data[counter]);
+				pixel.push(imgData.data[counter + 1]);
+				pixel.push(imgData.data[counter + 2]);
+				img_row.push(pixel);
+				counter += 4;
+			}
+			img_arr.push(img_row);
+		}
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				var json_string = this.responseText.replace(/\'/g, '"');
+				console.log(json_string);
+				var result = JSON.parse(json_string);
+				var id_encoding = result["id_encoding"];
+
+				out_uppers = JSON.parse(localStorage.getItem("out_uppers"));
+				out_lowers = JSON.parse(localStorage.getItem("out_lowers"));
+				var distance_arrs = [];
+				for(var i = 0; i < out_uppers.length; i++){
+					var other_vec = out_uppers[i][0];
+					distance_arrs.push(Euclidean_Dist_measure(id_encoding,other_vec));
+				}
+				for(var i = 0; i < out_lowers.length; i++){
+					var other_vec = out_lowers[i][0];
+					distance_arrs.push(Euclidean_Dist_measure(id_encoding,other_vec));
+				}
+
+				var smallest_distance = distance_arrs[0];
+				var smallest_distance_idx = 0;
+				for (var i = 1; i < distance_arrs.length; i++) {
+					if (distance_arrs[i] < smallest_distance) {
+						smallest_distance = distance_arrs[i];
+						smallest_distance_idx = i;
+					}
+				}
+
+				if(smallest_distance_idx<out_uppers.length){
+					//Upper
+					var to_switch = out_uppers[smallest_distance_idx];
+					var wardrobe = JSON.parse(localStorage.getItem("wardrobe"));
+					wardrobe.push(to_switch);
+					localStorage.setItem("wardrobe");
+					out_uppers.splice(smallest_distance_idx,1);
+					localStorage.setItem("out_uppers",JSON.stringify(out_uppers));
+				}else{
+					//Lower
+					var to_switch = out_lowers[smallest_distance_idx];
+					out_lowers.splice(smallest_distance_idx,1);
+					localStorage.setItem("out_lowers",JSON.stringify(out_lowers));
+				}
+
+				if (submode == "old") {
+					inputOldClothes(smallest_distance_idx);
+				} else if (submode == "wash") {
+					inputWashedClothes(smallest_distance_idx);
+				}
+
+
+			}
+		};
+		xhttp.open("POST", "http://ec2-18-222-219-42.us-east-2.compute.amazonaws.com/input_old", true);
+		xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+		xhttp.send(JSON.stringify(img_arr));
+	}
+
+	function outfits_API(upper_arr, lower_arr) {
+		var upper_encs = [];
+		var lower_encs = [];
+		var upper_ids = [];
+		var lower_ids = [];
+		var upper_items = JSON.parse(localStorage.getItem("current_uppers"));
+		var lower_items = JSON.parse(localStorage.getItem("current_lowers"));
+		for (var i = 0; i < upper_arr.length; i++) {
+			upper_encs.push(upper_arr[i][1]);
+			upper_ids.push(upper_arr[i][5]);
+		}
+		for (var i = 0; i < lower_arr.length; i++) {
+			lower_encs.push(lower_arr[i][1]);
+			lower_ids.push(lower_arr[i][5]);
+		}
+		var arr_to_send = [];
+		arr_to_send.push(upper_encs);
+		arr_to_send.push(lower_encs);
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				var json_string = this.responseText.replace(/\'/g, '"');
+				var result = JSON.parse(json_string);
+				var good_outfits = result["good_outfits"];
+
+				//Your code
+				if (good_outfits.length != 0) {
+					var current_outfits = JSON.parse(localStorage.getItem("current_outfits"));
+					for (var i = 0; i < good_outfits.length; i++) {
+						var outfit_ids = good_outfits[i];
+						var upper_id = upper_ids[outfit_ids[0]];
+						var lower_id = lower_ids[outfit_ids[1]];
+						var matchPercentage = outfit_ids[2];
+						var upper_item = upper_items[upper_id];
+						var lower_item = lower_items[lower_id];
+						var id = current_outfits.length;
+						var new_outfit = [upper_item, lower_item, matchPercentage,id];
+						current_outfits.push(new_outfit);
+					}
+					localStorage.setItem("current_outfits", JSON.stringify(current_outfits));
+				}
+			}
+		};
+		xhttp.open("POST", "http://ec2-18-222-219-42.us-east-2.compute.amazonaws.com/outfits", true);
+		xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+		xhttp.send(JSON.stringify(arr_to_send));
+	}
+</script>

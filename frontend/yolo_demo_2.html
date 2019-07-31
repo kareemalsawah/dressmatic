@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="theme-color" content="#2196f3">
+	<meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap:">
+	<title>DressMe</title>
+	<link rel="stylesheet" href="css/framework7.bundle.css">
+	<link rel="stylesheet" href="css/app.css">
+
+
+</head>
+
+<body>
+
+	<div id="app">
+
+
+		<div class="view view-main view-init safe-areas" data-master-detail-breakpoint="800" data-url="/">
+			<div class="page">
+				<div class="navbar">
+
+					<div class="title-large">
+						<div class="title-large-text custom-text customcenter">Dress Me</div>
+					</div>
+
+
+				</div>
+
+				<div class="page-content">
+					<br>
+					<br>
+					<br>
+					<br>
+					<button onclick="capImage();" class="col button button-large button-fill custombutton" id="buttonMain">Upload</button>
+
+
+					<br>
+					<center> <video width=250 height=250 id="player" style="display:none;" autoplay></video> </center>
+
+					<center> <canvas id="canvas" width=250 height=250></canvas> </center>
+					<center> <h2 id="data"></h2></center>
+
+
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+
+
+	<script src="js/framework7.bundle.js"></script>
+	<script src="js/routes.js"></script>
+	<script src="js/app.js"></script>
+	<script type="text/javascript" src="js/Functions.js"></script>
+</body>
+
+<script>
+	var canvas = document.getElementById("canvas");
+	var ctx = canvas.getContext("2d");
+	var player = document.getElementById("player");
+	var world_bbox = [];
+
+	function drawRect(x, y, w, h) {
+		var bbox = [x, y, w, h];
+		//var bbox = world_bbox;
+		ctx.beginPath();
+		ctx.lineWidth = "4";
+		ctx.strokeStyle = "green";
+		ctx.rect(bbox[0], bbox[1], bbox[2], bbox[3]);
+		ctx.stroke();
+		ctx.closePath();
+	}
+	videoPlayer(player);
+
+	function capImage() {
+		captureImage(player, canvas, ctx);
+		var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+		var width = imgData.width;
+		var height = imgData.height;
+		var img_arr = [];
+		var counter = 0;
+		for (var i = 0; i < height; i++) {
+			img_row = []
+			for (var j = 0; j < width; j++) {
+				pixel = [];
+				pixel.push(imgData.data[counter]);
+				pixel.push(imgData.data[counter + 1]);
+				pixel.push(imgData.data[counter + 2]);
+				img_row.push(pixel);
+				counter += 4;
+			}
+			img_arr.push(img_row);
+		}
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				var json_string = this.responseText.replace(/\'/g, '"').replace("(", "[").replace(")", "]").replace("(", "[").replace(")", "]");
+				console.log(json_string);
+				var result = JSON.parse(json_string);
+				var to_print = "";
+				for (var i = 0; i < result.length; i++) {
+					var object_data = result[i];
+					var type = object_data['main_type'];
+					var secondary_type = object_data['secondary_type'];
+					var colors = object_data['colors'];
+					var bbox = object_data['bbox'];
+					drawRect(bbox[0], bbox[1], bbox[2], bbox[3]);
+					to_print = "Found a "+colors+" "+secondary_type+"\n";
+
+				}
+				document.getElementById("data").innerHTML = to_print;
+				//document.getElementById("results").innerHTML = result['colors']+" "+result['secondary_type'];
+			}
+		};
+		xhttp.open("POST", "http://ec2-18-222-219-42.us-east-2.compute.amazonaws.com/yolo_demo", true);
+		xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		xhttp.setRequestHeader("Access-Control-Allow-Origin", "*");
+		xhttp.send(JSON.stringify(img_arr));
+	}
+
+
+	function videoPlayer(player) {
+		player.style.display = "block";
+		const constraints = {
+			video: true,
+			facingMode: 'environment',
+		};
+		navigator.mediaDevices.getUserMedia(constraints)
+			.then((stream) => {
+				player.srcObject = stream;
+
+				const track = stream.getVideoTracks()[0];
+				player.addEventListener('loadedmetadata', (e) => {
+					window.setTimeout(() => (
+						onCapabilitiesReady(track.getCapabilities())
+					), 500);
+				});
+
+				function onCapabilitiesReady(capabilities) {
+					if (capabilities.torch) {
+						track.applyConstraints({
+								advanced: [{
+									torch: true
+								}]
+							})
+							.catch(e => console.log(e));
+					}
+				}
+			});
+	}
+
+	function videoPlayerClose(player) {
+		player.style.display = "none";
+		const constraints = {
+			video: true,
+			facingMode: 'environment',
+		};
+		navigator.mediaDevices.getUserMedia(constraints)
+			.then((stream) => {
+				player.srcObject = stream;
+
+				const track = stream.getVideoTracks()[0];
+				player.addEventListener('loadedmetadata', (e) => {
+					window.setTimeout(() => (
+						onCapabilitiesReady(track.getCapabilities())
+					), 500);
+				});
+
+				function onCapabilitiesReady(capabilities) {
+					if (capabilities.torch) {
+						track.applyConstraints({
+								advanced: [{
+									torch: false
+								}]
+							})
+							.catch(e => console.log(e));
+					}
+				}
+			});
+	}
+
+	function captureImage(player, canvas, context) {
+		ctr = context.drawImage(player, 0, 0, canvas.width, canvas.height);
+		canvas.style.display = "block";
+		player.style.display = "none";
+		return ctr;
+	}
+</script>
+
+</html>
